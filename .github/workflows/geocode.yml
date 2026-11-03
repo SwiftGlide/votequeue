@@ -1,0 +1,40 @@
+name: Geocode Voting Stations
+
+on:
+  workflow_dispatch:   # run manually from the Actions tab
+
+jobs:
+  geocode:
+    name: "${{ matrix.province }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360   # 6-hour ceiling per job
+
+    strategy:
+      fail-fast: false     # keep other provinces running if one fails
+      matrix:
+        province:
+          - "Eastern Cape"
+          - "Free State"
+          - "Gauteng"
+          - "KwaZulu-Natal"
+          - "Limpopo"
+          - "Mpumalanga"
+          - "North West"
+          - "Northern Cape"
+          - "Western Cape"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Geocode — ${{ matrix.province }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python3 geocode.py --province "${{ matrix.province }}"

@@ -7,10 +7,12 @@ on a hit.  Re-runs only touch stations that haven't been attempted yet, so
 the loop is safe to interrupt and restart.
 
 Usage:
-  python3 geocode.py            # normal: skip already-checked rows
-  python3 geocode.py --recheck  # retry all null-lat rows, even prev failures
+  python3 geocode.py                          # all provinces, never-checked only
+  python3 geocode.py --province "Gauteng"     # single province
+  python3 geocode.py --recheck                # retry all null-lat rows
+  python3 geocode.py --recheck --province "Western Cape"
 
-~6.5 h for 23 k stations at Nominatim's 1 req/s ToS limit.
+~40 min total when run as 9 parallel GitHub Actions jobs (one per province).
 """
 import time, json, urllib.request, urllib.parse, sys
 from datetime import datetime, timezone
@@ -25,7 +27,14 @@ NOM_HEADERS = {
     'Accept': 'application/json',
 }
 
-RECHECK = '--recheck' in sys.argv   # retry prev failures if True
+RECHECK  = '--recheck' in sys.argv
+
+# --province "Gauteng"  (optional)
+PROVINCE = None
+if '--province' in sys.argv:
+    idx = sys.argv.index('--province')
+    if idx + 1 < len(sys.argv):
+        PROVINCE = sys.argv[idx + 1]
 
 # Module-level consecutive error counter
 nom_errors = 0
@@ -55,9 +64,9 @@ def _nom_query(q):
 def geocode(name, address, municipality, province):
     """
     Try three queries in order, stopping at first hit:
-      1. Station name + municipality + province  (building search)
-      2. Station name + city (from address)      (broader building search)
-      3. Street address + province               (original approach)
+      1. Station name + municipality + province
+      2. Station name + city (from address)
+      3. Street address + province
     Each costs 1 req/s — caller must sleep between stations.
     """
     addr_parts = [p.strip() for p in address.split(',') if p.strip()]
@@ -96,17 +105,19 @@ def _sb_headers(extra=None):
     return h
 
 
-def fetch_stations(recheck=False):
+def fetch_stations(recheck=False, province=None):
     """
     Fetch stations where lat IS NULL.
-    Normal mode:  also require last_checked IS NULL (never attempted).
-    Recheck mode: return all null-lat rows, including prev failures.
-    Paginates in batches of 1 000 to bypass Supabase's default row cap.
-    Sorted Z–A by name.
+    Normal mode:  also require last_checked IS NULL.
+    Recheck mode: all null-lat rows including prev failures.
+    Province:     filter to one province when set.
+    Sorted Z–A by name. Paginates in batches of 1000.
     """
     filters = 'lat=is.null'
     if not recheck:
         filters += '&last_checked=is.null'
+    if province:
+        filters += f'&province=eq.{urllib.parse.quote(province)}'
 
     all_stations = []
     page, page_size = 0, 1000
@@ -158,9 +169,10 @@ def patch(station_id, lat, lng):
 
 def main():
     mode = 'RECHECK (all null-lat)' if RECHECK else 'NORMAL (never-checked only)'
-    print(f'Mode: {mode}\n')
+    scope = f'province={PROVINCE}' if PROVINCE else 'all provinces'
+    print(f'Mode: {mode} | Scope: {scope}\n')
 
-    stations = fetch_stations(recheck=RECHECK)
+    stations = fetch_stations(recheck=RECHECK, province=PROVINCE)
     total    = len(stations)
     print(f'\n{total} stations to process\n')
 
