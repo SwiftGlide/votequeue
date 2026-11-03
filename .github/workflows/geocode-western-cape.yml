@@ -1,0 +1,33 @@
+name: "Geocode — Western Cape"
+
+on:
+  workflow_dispatch:
+    inputs:
+      recheck:
+        description: "Retry previously-failed rows (no coords found)"
+        type: boolean
+        default: false
+
+jobs:
+  geocode:
+    name: "Western Cape"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Geocode — Western Cape
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          ARGS="--province \"Western Cape\""
+          if [ "${{ inputs.recheck }}" = "true" ]; then ARGS="$ARGS --recheck"; fi
+          eval python3 geocode.py $ARGS
