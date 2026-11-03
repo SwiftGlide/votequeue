@@ -61,24 +61,18 @@ def _nom_query(q):
     return None, None
 
 
-def geocode(name, address, municipality, province):
+def geocode(name, province):
     """
-    Try three queries in order, stopping at first hit:
-      1. Station name + municipality + province
-      2. Station name + city (from address)
-      3. Street address + province
+    Try two queries in order, stopping at first hit:
+      1. Station name + province
+      2. Station name alone
     Each costs 1 req/s — caller must sleep between stations.
     """
-    addr_parts = [p.strip() for p in address.split(',') if p.strip()]
-    city = addr_parts[1] if len(addr_parts) > 1 else ''
-
     attempts = []
+    if name and province:
+        attempts.append(f'{name}, {province}, South Africa')
     if name:
-        attempts.append(f'{name}, {municipality}, {province}, South Africa')
-        if city:
-            attempts.append(f'{name}, {city}, South Africa')
-    if address:
-        attempts.append(f'{address}, {province}, South Africa')
+        attempts.append(f'{name}, South Africa')
 
     for i, q in enumerate(attempts):
         if i > 0:
@@ -125,7 +119,7 @@ def fetch_stations(recheck=False, province=None):
         start = page * page_size
         end   = start + page_size - 1
         url   = (f'{SUPABASE_URL}/rest/v1/voting_stations'
-                 f'?{filters}&select=id,name,address,municipality,province&order=name.desc')
+                 f'?{filters}&select=id,name,province&order=name.desc')
         req   = urllib.request.Request(url, headers={
             **_sb_headers(),
             'Accept': 'application/json',
@@ -186,12 +180,10 @@ def main():
 
     for i, s in enumerate(stations):
         sid  = s['id']
-        name = (s.get('name')         or '').strip()
-        addr = (s.get('address')      or '').strip()
-        muni = (s.get('municipality') or '').strip()
-        prov = (s.get('province')     or '').strip()
+        name = (s.get('name')     or '').strip()
+        prov = (s.get('province') or '').strip()
 
-        lat, lng = geocode(name, addr, muni, prov)
+        lat, lng = geocode(name, prov)
 
         time.sleep(1)   # Nominatim ToS: ≤ 1 req/s between stations
 
