@@ -70,9 +70,9 @@ def geocode(name, province):
     """
     attempts = []
     if name and province:
-        attempts.append(f'{name}, {province}, South Africa')
+        attempts.append(f'{name}, {province}')
     if name:
-        attempts.append(f'{name}, South Africa')
+        attempts.append(f'{name}')
 
     for i, q in enumerate(attempts):
         if i > 0:
